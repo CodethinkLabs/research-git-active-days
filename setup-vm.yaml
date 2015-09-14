@@ -1,0 +1,54 @@
+# Ansible playbook to set up an environment for running git-active-days scripts.
+#
+# This expects to be run on a newly created Fedora 22 Cloud instance, with a
+# large volume available as /dev/vdb.
+#
+# You will need to create a 'hosts' file listing the IP of the instance and how
+# to connect. Then you can run this script with `ansible-playbook`. For example:
+#
+#   echo '172.16.20.136 ansible_ssh_user=fedora' > hosts
+#   ansible-playbook -i hosts ./setup-vm.yaml
+---
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: hack to make DNF module work
+      command: dnf install -y yum-utils
+      args:
+        creates: /usr/bin/repoquery
+      sudo: yes
+
+    - name: install latest updates
+      dnf: name=* state=latest
+      sudo: yes
+
+    # This will NEVER overwrite an existing filesystem. Unless you add
+    # 'force=yes' to the arguments. So don't do that. See:
+    # http://docs.ansible.com/filesystem_module.html.
+    - name: ext4 filesystem on /dev/vdb
+      filesystem: fstype=ext4 dev=/dev/vdb
+      sudo: yes
+
+    - name: mount volume for Git repos
+      mount: src=/dev/vdb name=/src fstype=ext4 state=mounted
+      sudo: yes
+
+    - name: give 'fedora' user access to /src
+      file: path=/src owner=fedora
+      sudo: yes
+
+    - name: install Git
+      dnf: name=git state=latest
+      sudo: yes
+
+    - name: check out my fork of YBD, from Git
+      git: dest=/src/ybd repo=https://github.com/ssssam/ybd version=sam/ybd-as-library
+
+    - name: install YBD's Python dependencies
+      pip: extra_args='--user' requirements=/src/ybd/requirements.txt
+
+    - name: install YBD from the source tree
+      command: python ./setup.py install --user
+      args:
+        chdir: /src/ybd
+        creates: ~/.local/lib/python2.7/site-packages/ybd
