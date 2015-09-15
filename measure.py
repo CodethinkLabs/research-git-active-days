@@ -90,13 +90,23 @@ def sloccount_physical_source_lines_of_code(name, source_dir):
     raise RuntimeError("Unexpected output from sloccount: %s" % text)
 
 
-def git_active_days(gitdir, ref):
+def git_active_days(gitdir, ref, per_author=False):
     # This uses the 'git-active-days' script in the same repo.
-
     script = os.path.join(os.path.dirname(__file__), 'git-active-days')
-    text = subprocess.check_output([script, '--ref', ref, gitdir])
+
+    args = ['--ref', ref]
+    if per_author:
+        args += ['--per-author']
+
+    text = subprocess.check_output([script] + args + [gitdir])
 
     return int(text.decode('ascii').strip())
+
+
+def git_count_authors(gitdir, ref):
+    text = subprocess.check_output(
+        ['git', 'shortlog', '--email', '--summary', ref], cwd=gitdir)
+    return len(text.splitlines())
 
 
 def measure_component_source_repo(name, repo, ref):
@@ -106,16 +116,26 @@ def measure_component_source_repo(name, repo, ref):
     try:
         extract_commit(name, repo, ref, source_dir)
 
-        sloc = sloccount_physical_source_lines_of_code(name, source_dir)
+        try:
+            sloc = sloccount_physical_source_lines_of_code(name, source_dir)
+        except subprocess.CalledProcessError as e:
+            ybd.app.log(name, "Error running sloccount", e)
+            sloc = -1
 
         gitdir = os.path.join(ybd.app.config['gits'],
                               ybd.repos.get_repo_name(repo))
         active_days = git_active_days(gitdir, ref)
 
+        active_days_per_author = git_active_days(gitdir, ref, per_author=True)
+
+        authors = git_count_authors(gitdir, ref)
+
         return {
             'name': name,
             'sloc': sloc,
-            'git_active_days': active_days
+            'git_active_days': active_days,
+            'git_active_days_per_author': active_days_per_author,
+            'git_authors': authors,
         }
     finally:
         if os.path.exists(source_dir):
@@ -149,22 +169,31 @@ def main():
 
     # Now we need to get the build graph for 'target', and get all
     # the repos that are involved.
-    components = list(walk_dependencies(definitions, target))
+    #
+    # The list is reversed because otherwise gcc and binutils end up first,
+    # and they are the biggest repos :-)
+    components = reversed(list(walk_dependencies(definitions, target)))
 
-    results = {}
-    for c in components:
-        if 'repo' in c and 'ref' in c:
-            key = (c['repo'], c['ref'])
-            if key not in results:
-                stats = measure_component_source_repo(
-                    c['name'], c['repo'], c['ref'])
-                results[key] = stats
+    try:
+        results = {}
+        for c in components:
+            if 'repo' in c and 'ref' in c:
+                key = (c['repo'], c['ref'])
+                if key not in results:
+                    stats = measure_component_source_repo(
+                        c['name'], c['repo'], c['ref'])
+                    results[key] = stats
+    except KeyboardInterrupt:
+        # It's nice when developing the script to be able to ctrl+c and still
+        # get some results.
+        pass
 
     with open('results.csv', 'w') as f:
+        ybd.app.log('results', 'Writing results to', 'results.csv')
         write_csv_file(
             f,
             rows=results.values(),
-            columns=['name', 'sloc', 'git_active_days'])
+            columns=['name', 'sloc', 'git_active_days', 'git_active_days_per_author', 'git_authors'])
 
 try:
     main()

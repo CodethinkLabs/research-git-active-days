@@ -12,11 +12,35 @@ def active_days(repo, ref):
     text = subprocess.check_output(
         ['git', 'log' , '--pretty=format:%ai', ref], cwd=repo)
 
-    dates = set()
+    days = set()
     for line in text.decode('ascii').splitlines():
         date, time, timezone = line.split()
-        dates.add(date)
-    return dates
+        days.add(date)
+    return days
+
+
+def active_days_per_author(repo, ref):
+    '''Return the list of active days in 'repo' for each commit author.
+
+    For example, if Fred made four commits on Monday, and Suzie committed once
+    on Monday and Tuesday, you will get 3 results: Fred was active Monday,
+    and Suzie was active Monday and Tuesday.
+
+    '''
+
+    # In theory, any character could appear in the email address
+    # so we should use \0 as a separator, or something.
+    # See: https://tools.ietf.org/html/rfc3696#section-3
+
+    text = subprocess.check_output(
+        ['git', 'log' , '--pretty=format:%ae:%ai', ref], cwd=repo)
+
+    author_days = set()
+    for line in text.decode('ascii').splitlines():
+        author_email, datetime = line.split(':', 1)
+        date, time, timezone = datetime.split()
+        author_days.add((author_email, date))
+    return author_days
 
 
 def argument_parser():
@@ -28,6 +52,13 @@ def argument_parser():
     #    '--filter-author-email', metavar='PATTERN', nargs=1, type=str,
     #    help="only count commits where the author email matches a glob "
     #         "pattern")
+
+    # It might be clearer to have the inverse of this option instead
+    # (--combine-authors), but it's nice to have the default behaviour be
+    # the same as that of `git-summary` and `git-effort`.
+    parser.add_argument(
+        '--per-author', action='store_true',
+        help="count commits per author on each day, not just number of days")
 
     parser.add_argument(
         '--ref', metavar='REF', type=str, default='HEAD',
@@ -45,16 +76,26 @@ def argument_parser():
 def main():
     args = argument_parser().parse_args()
 
-    total_active_days = set()
 
     # This returns an 'overall' active days figure, when given multiple repos.
     # I'm not sure how useful that actually is.
 
-    for repo in args.repos or ['.']:
-        days = active_days(repo, ref=args.ref)
-        total_active_days.update(days)
+    result = None
 
-    print(len(total_active_days))
+    if args.per_author:
+        all_author_days = set()
+        for repo in args.repos or ['.']:
+            author_days = active_days_per_author(repo, ref=args.ref)
+            all_author_days.update(author_days)
+        result = len(all_author_days)
+    else:
+        all_days = set()
+        for repo in args.repos or ['.']:
+            days = active_days(repo, ref=args.ref)
+            all_days.update(days)
+        result = len(all_days)
+
+    print(result)
 
 
 main()
