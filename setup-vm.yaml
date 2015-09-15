@@ -41,6 +41,10 @@
       dnf: name=git state=latest
       sudo: yes
 
+    - name: install sloccount
+      dnf: name=sloccount state=latest
+      sudo: yes
+
     - name: check out my fork of YBD, from Git
       git: dest=/src/ybd repo=https://github.com/ssssam/ybd version=sam/ybd-as-library
 

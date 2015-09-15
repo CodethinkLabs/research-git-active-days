@@ -46,7 +46,7 @@ def load_ybd_definitions(target_filename):
     return definitions
 
 
-def extract_commit(repo, ref, target_dir):
+def extract_commit(name, repo, ref, target_dir):
     '''Check out a single commit (or tree) from a Git repo.
 
     The ybd.repos.checkout() function actually clones the entire repo, so this
@@ -74,17 +74,62 @@ def extract_commit(repo, ref, target_dir):
             ['git', 'checkout-index', '--all'], env=git_env, cwd=gitdir)
 
 
+def sloccount_physical_source_lines_of_code(name, source_dir):
+    # There's no 'machine-readable' output feature of 'sloccount' that we could
+    # use, we just match against a string in the output.
+
+    ybd.app.log(name, "Counting lines of code with sloccount in", source_dir)
+    text = subprocess.check_output(['sloccount', source_dir])
+
+    for line in text.decode('ascii').splitlines():
+        if line.startswith('Total Physical Source Lines of Code (SLOC)'):
+            number_string = line.split()[-1]
+            number_string = number_string.replace(',', '')
+            return int(number_string)
+
+    raise RuntimeError("Unexpected output from sloccount: %s" % text)
+
+
+def git_active_days(gitdir, ref):
+    # This uses the 'git-active-days' script in the same repo.
+
+    script = os.path.join(os.path.dirname(__file__), 'git-active-days')
+    text = subprocess.check_output([script, '--ref', ref, gitdir])
+
+    return int(text.decode('ascii').strip())
+
+
 def measure_component_source_repo(name, repo, ref):
     # Don't do this in /tmp, because on an OpenStack VM's root disk it will
     # take FOREVER. FIXME: should get the path from YBD's config probably.
     source_dir = tempfile.mkdtemp(dir='/src/tmp')
     try:
-        extract_commit(repo, ref, source_dir)
+        extract_commit(name, repo, ref, source_dir)
 
-        os.listdir(source_dir)
+        sloc = sloccount_physical_source_lines_of_code(name, source_dir)
+
+        gitdir = os.path.join(ybd.app.config['gits'],
+                              ybd.repos.get_repo_name(repo))
+        active_days = git_active_days(gitdir, ref)
+
+        return {
+            'name': name,
+            'sloc': sloc,
+            'git_active_days': active_days
+        }
     finally:
         if os.path.exists(source_dir):
             shutil.rmtree(source_dir)
+
+
+def write_csv_file(f, rows, columns):
+    # This is really naive, probably we can use a library.
+
+    f.write(', '.join(columns) + '\n')
+
+    for item in rows:
+        line = ', '.join(str(item[column]) for column in columns)
+        f.write(line + '\n')
 
 
 def main():
@@ -106,14 +151,20 @@ def main():
     # the repos that are involved.
     components = list(walk_dependencies(definitions, target))
 
-    done = set()
+    results = {}
     for c in components:
         if 'repo' in c and 'ref' in c:
             key = (c['repo'], c['ref'])
-            if key not in done:
-                done.add(key)
-                measure_component_source_repo(c['name'], c['repo'], c['ref'])
+            if key not in results:
+                stats = measure_component_source_repo(
+                    c['name'], c['repo'], c['ref'])
+                results[key] = stats
 
+    with open('results.csv', 'w') as f:
+        write_csv_file(
+            f,
+            rows=results.values(),
+            columns=['name', 'sloc', 'git_active_days'])
 
 try:
     main()

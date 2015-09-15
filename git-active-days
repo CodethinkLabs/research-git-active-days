@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+import subprocess
+import sys
+
+
+def active_days(repo, ref):
+    '''Returns the set of days where 'repo' had at least one commit.'''
+
+    text = subprocess.check_output(
+        ['git', 'log' , '--pretty=format:%ai', ref], cwd=repo)
+
+    dates = set()
+    for line in text.decode('ascii').splitlines():
+        date, time, timezone = line.split()
+        dates.add(date)
+    return dates
+
+
+def argument_parser():
+    parser = argparse.ArgumentParser(
+        description="Counts days where commits were made, across one or more "
+                    "Git repositories.")
+
+    #parser.add_argument(
+    #    '--filter-author-email', metavar='PATTERN', nargs=1, type=str,
+    #    help="only count commits where the author email matches a glob "
+    #         "pattern")
+
+    parser.add_argument(
+        '--ref', metavar='REF', type=str, default='HEAD',
+        help="branch or tag to measure from (defaults to what is checked out)")
+
+    parser.add_argument(
+        'repos', metavar='[<repos>]', type=str, nargs='*',
+        help="Path to one or more Git repos. Where there are multiple repos, "
+             "an 'active day' is one where there was a commit in any of those "
+             "repos. If no paths are given, the current directory is used.")
+
+    return parser
+
+
+def main():
+    args = argument_parser().parse_args()
+
+    total_active_days = set()
+
+    # This returns an 'overall' active days figure, when given multiple repos.
+    # I'm not sure how useful that actually is.
+
+    for repo in args.repos or ['.']:
+        days = active_days(repo, ref=args.ref)
+        total_active_days.update(days)
+
+    print(len(total_active_days))
+
+
+main()
