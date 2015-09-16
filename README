@@ -1,7 +1,62 @@
-How to set up a work environment
---------------------------------
+Git Active Days
+===============
 
-You need a machine with a large volume. I used an OpenStack instance.
+This repo contains tools for analysing software projects using the 'Git Active
+Days' metric.
 
-The setup-vm.yaml playbook shows how I set up a development environment for
-this research. Feel free to use it, or not.
+
+Requirements
+------------
+
+You need a computer with a minimum 10GB of free disk space, with Git, Python,
+sloccount, and [YBD] installed.
+
+[YBD]: https://github.com/devcurmudgeon/ybd/
+
+
+Running the scripts
+-------------------
+
+Clone this repo, and the Baserock reference system definitions.
+
+    git clone git://github.com/ssssam/research-git-active-days
+    git clone git://git.baserock.org/baserock/baserock/definitions
+
+Now run the measure.py script:
+
+    cd definitions
+    python ../research-git-active-days/measure.py systems/genivi-baseline-system-x86_64.morph
+
+The script will find every component of the Baserock GENIVI Baseline reference
+system, clone all of the source code involved locally, and then use `sloccount`
+and the `git-active-days` script from this repo to analyse it. The results will
+be written to `results.csv` in the current directory.
+
+The downloaded Git repos will be kept in `~/.cache/ybd` by default. You can
+change the location by adding a custom ybd.conf file to the definitions/
+directory.
+
+
+Reproducing the exact work environment
+--------------------------------------
+
+The original results were produced in an OpenStack instance running Fedora
+Cloud 22.
+
+To reproduce this environment you can use the `setup-vm.yaml` Ansible playbook.
+First, create an OpenStack instance from a [Fedora Cloud] image, and attach a
+100GB volume.
+
+Then, run the following commands in a local clone of this repo. Replace the
+IP address with the actual IP of the OpenStack instance:
+
+    echo '172.16.20.136 ansible_ssh_user=fedora' > hosts
+    ansible-playbook -i hosts ./setup-vm.yaml
+
+The 'install latest updates' step will probably be slow, you can get away with
+commenting it out if you are impatient.
+
+Then you can SSH to the instance as user 'fedora' and run the measure.py script
+as described above.
+
+Fedora Cloud: https://getfedora.org/en/cloud/download/

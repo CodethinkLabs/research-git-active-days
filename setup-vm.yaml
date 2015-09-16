@@ -29,12 +29,10 @@
       filesystem: fstype=ext4 dev=/dev/vdb
       sudo: yes
 
-    - name: mount volume for Git repos
-      mount: src=/dev/vdb name=/src fstype=ext4 state=mounted
-      sudo: yes
-
-    - name: give 'fedora' user access to /src
-      file: path=/src owner=fedora
+    # Be careful if you mount this at /home/fedora instead -- you need to keep
+    # the existing /home/fedora/.ssh/authorized_keys in order to log in!
+    - name: mount external volume at /home/fedora/.cache
+      mount: src=/dev/vdb name=/home/fedora/.cache fstype=ext4 state=mounted
       sudo: yes
 
     - name: install Git
@@ -45,14 +43,14 @@
       dnf: name=sloccount state=latest
       sudo: yes
 
-    - name: check out my fork of YBD, from Git
-      git: dest=/src/ybd repo=https://github.com/ssssam/ybd version=sam/ybd-as-library
+    - name: check out YBD from Git
+      git: dest=~/ybd repo=https://github.com/devcurmudgeon/ybd version=master
 
     - name: install YBD's Python dependencies
-      pip: extra_args='--user' requirements=/src/ybd/requirements.txt
+      pip: extra_args='--user' requirements=~/ybd/requirements.txt
 
     - name: install YBD from the source tree
       command: python ./setup.py install --user
       args:
-        chdir: /src/ybd
+        chdir: ~/ybd
         creates: ~/.local/lib/python2.7/site-packages/ybd
