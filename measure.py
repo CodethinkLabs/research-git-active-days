@@ -70,10 +70,10 @@ def main():
 
     with open('results.csv', 'w') as f:
         ybd.app.log('results', 'Writing results to', 'results.csv')
+        rows = results.values()
+        columns = sorted(rows[0].keys())
         write_csv_file(
-            f,
-            rows=results.values(),
-            columns=['name', 'sloc', 'git_active_days', 'git_active_days_per_author', 'git_authors', 'ref_name'])
+            f, rows=results.values(), columns=columns)
 
 
 def load_ybd_definitions(target_filename):
@@ -105,17 +105,27 @@ def measure_component_source_repo(name, repo, ref):
 
         gitdir = os.path.join(ybd.app.config['gits'],
                               ybd.repos.get_repo_name(repo))
-        active_days = git_active_days(gitdir, ref)
 
-        active_days_per_author = git_active_days(gitdir, ref, per_author=True)
+        all_refs_active_days = git_active_days(
+            gitdir)
+
+        all_refs_active_days_per_author = git_active_days(
+            gitdir, per_author=True)
+
+        ref_active_days = git_active_days(gitdir, ref=ref)
+
+        ref_active_days_per_author = git_active_days(
+            gitdir, ref=ref, per_author=True)
 
         authors = git_count_authors(gitdir, ref)
 
         return {
             'name': name,
             'sloc': sloc,
-            'git_active_days': active_days,
-            'git_active_days_per_author': active_days_per_author,
+            'git_active_days_all_refs': all_refs_active_days,
+            'git_active_days_per_author_all_refs': all_refs_active_days_per_author,
+            'git_active_days_for_ref': ref_active_days,
+            'git_active_days_per_author_for_ref': ref_active_days_per_author,
             'git_authors': authors,
         }
     finally:
@@ -132,7 +142,7 @@ def sloccount_physical_source_lines_of_code(name, source_dir):
     ybd.app.log(name, "Counting lines of code with sloccount in", source_dir)
     text = subprocess.check_output(['sloccount', source_dir])
 
-    for line in text.decode('ascii').splitlines():
+    for line in text.decode('unicode-escape').splitlines():
         if line.startswith('Total Physical Source Lines of Code (SLOC)'):
             number_string = line.split()[-1]
             number_string = number_string.replace(',', '')
@@ -141,15 +151,22 @@ def sloccount_physical_source_lines_of_code(name, source_dir):
     raise RuntimeError("Unexpected output from sloccount: %s" % text)
 
 
-def git_active_days(gitdir, ref, per_author=False):
+def git_active_days(gitdir, ref=None, per_author=False):
     '''Use 'git-active-days' to measure activity in a Git repository.
+
+    If 'ref' is passed, days for just that ref are returned. Otherwise, all
+    refs are included in the measurement.
 
     The 'git-active-days' script lives alongside this one.
 
     '''
     script = os.path.join(os.path.dirname(__file__), 'git-active-days')
 
-    args = ['--ref', ref]
+    if ref:
+        args = ['--ref', ref]
+    else:
+        args = ['--all-refs']
+
     if per_author:
         args += ['--per-author']
 
