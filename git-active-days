@@ -26,11 +26,10 @@ import subprocess
 import sys
 
 
-def active_days(repo, ref):
+def active_days(repo, refs):
     '''Returns the set of days where 'repo' had at least one commit.'''
-
-    text = subprocess.check_output(
-        ['git', 'log' , '--pretty=format:%ai', ref], cwd=repo)
+    # List the author date for each commit.
+    text = git_output(['git', 'log' , '--pretty=format:%ai'] + refs, cwd=repo)
 
     days = set()
     for line in text.decode('ascii').splitlines():
@@ -39,7 +38,7 @@ def active_days(repo, ref):
     return days
 
 
-def active_days_per_author(repo, ref):
+def active_days_per_author(repo, refs):
     '''Return the list of active days in 'repo' for each commit author.
 
     For example, if Fred made four commits on Monday, and Suzie committed once
@@ -47,13 +46,11 @@ def active_days_per_author(repo, ref):
     and Suzie was active Monday and Tuesday.
 
     '''
-
+    # List author email and author date for each commit.
     # In theory, any character could appear in the email address
     # so we should use \0 as a separator, or something.
     # See: https://tools.ietf.org/html/rfc3696#section-3
-
-    text = subprocess.check_output(
-        ['git', 'log' , '--pretty=format:%ae:%ai', ref], cwd=repo)
+    text = git_output(['git', 'log' , '--pretty=format:%ae:%ai'] + refs, cwd=repo)
 
     author_days = set()
     for line in text.decode('ascii').splitlines():
@@ -61,6 +58,28 @@ def active_days_per_author(repo, ref):
         date, time, timezone = datetime.split()
         author_days.add((author_email, date))
     return author_days
+
+
+def git_output(args, cwd=None):
+    try:
+        text = subprocess.check_output(args, cwd=cwd, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("Git command failed, with output:\n%s" % e.output)
+    return text
+
+
+def check_refs_exist(repo, refs):
+    missing = []
+    for ref in refs:
+        if ref != '--all':
+            with open(os.devnull, 'w') as f:
+                result = subprocess.call(
+                    ['git', 'rev-parse', '--verify', ref], stderr=f, stdout=f)
+            if result != 0:
+                missing.append(ref)
+    if len(missing) > 0:
+        raise RuntimeError(
+            "Did not find refs %s in repo %s" % (', '.join(refs), repo))
 
 
 def argument_parser():
@@ -80,12 +99,18 @@ def argument_parser():
         '--per-author', action='store_true',
         help="count commits per author on each day, not just number of days")
 
+    # This works by injecting the '--all' commandline option into the list of
+    # refs, which we pass straight through to `git log`.
     parser.add_argument(
-        '--ref', metavar='REF', type=str, default='HEAD',
-        help="branch or tag to measure from (defaults to what is checked out)")
+        '--all-refs', action='store_const', dest='refs', const=['--all'],
+        help="measure all commits in all Git refs")
 
     parser.add_argument(
-        'repos', metavar='[<repos>]', type=str, nargs='*',
+        '--ref', metavar='REF', action='append', dest='refs',
+        help="a Git ref pattern to measure. Default is to measure HEAD.")
+
+    parser.add_argument(
+        'repos', metavar='<repo>', type=str, nargs='*',
         help="Path to one or more Git repos. Where there are multiple repos, "
              "an 'active day' is one where there was a commit in any of those "
              "repos. If no paths are given, the current directory is used.")
@@ -96,26 +121,35 @@ def argument_parser():
 def main():
     args = argument_parser().parse_args()
 
+    if len(args.repos) == 0:
+        args.repos = ['.']
 
-    # This returns an 'overall' active days figure, when given multiple repos.
-    # I'm not sure how useful that actually is.
+    if args.refs is None:
+        args.refs = ['HEAD']
+    else:
+        for repo in args.repos:
+            check_refs_exist(repo, args.refs)
 
     result = None
 
     if args.per_author:
         all_author_days = set()
-        for repo in args.repos or ['.']:
-            author_days = active_days_per_author(repo, ref=args.ref)
+        for repo in args.repos:
+            author_days = active_days_per_author(repo, refs=args.refs)
             all_author_days.update(author_days)
         result = len(all_author_days)
     else:
         all_days = set()
-        for repo in args.repos or ['.']:
-            days = active_days(repo, ref=args.ref)
+        for repo in args.repos:
+            days = active_days(repo, refs=args.refs)
             all_days.update(days)
         result = len(all_days)
 
     print(result)
 
 
-main()
+try:
+    main()
+except RuntimeError as e:
+    sys.stderr.write('ERROR: %s\n' % e)
+    sys.exit(1)
