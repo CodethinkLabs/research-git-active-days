@@ -21,6 +21,7 @@ The idea of the 'Git Active Days' metric was taken from the `git-summary` and
 '''
 
 import argparse
+import fnmatch
 import os
 import subprocess
 import sys
@@ -95,15 +96,27 @@ def check_refs_exist(repo, refs):
             "Did not find refs %s in repo %s" % (', '.join(refs), repo))
 
 
+def filter_person_days(person_days_set, author_email_glob):
+    result = set()
+    for item in person_days_set:
+        if fnmatch.fnmatch(item[0], author_email_glob):
+            result.add(item)
+    if len(result) == 0 and '*' not in author_email_glob:
+        sys.stderr.write(
+            "Glob '%s' didn't match any email addresses. Perhaps '*%s*' "
+            "would?\n" % (author_email_glob, author_email_glob))
+    return result
+
+
 def argument_parser():
     parser = argparse.ArgumentParser(
         description="Counts days where commits were made, across one or more "
                     "Git repositories.")
 
-    #parser.add_argument(
-    #    '--filter-author-email', metavar='PATTERN', nargs=1, type=str,
-    #    help="only count commits where the author email matches a glob "
-    #         "pattern")
+    parser.add_argument(
+        '--filter-author-email', metavar='PATTERN', type=str,
+        help="only count commits where the author's email matches a glob "
+             "pattern")
 
     # It might be clearer to have the inverse of this option instead
     # (--combine-authors), but it's nice to have the default behaviour be
@@ -143,6 +156,10 @@ def main():
         for repo in args.repos:
             check_refs_exist(repo, args.refs)
 
+    if args.filter_author_email and not args.person_days:
+        raise RuntimeError("The --filter-author-email option cannot be used "
+                           "without --person-days.")
+
     result = None
 
     if args.person_days:
@@ -150,12 +167,19 @@ def main():
         for repo in args.repos:
             person_days = active_person_days(repo, refs=args.refs)
             all_person_days.update(person_days)
+
+        if args.filter_author_email:
+            all_person_days = filter_person_days(
+                all_person_days, args.filter_author_email)
+
         result = len(all_person_days)
     else:
         all_days = set()
         for repo in args.repos:
             days = active_days(repo, refs=args.refs)
             all_days.update(days)
+
+
         result = len(all_days)
 
     print(result)
