@@ -59,4 +59,4 @@ commenting it out if you are impatient.
 Then you can SSH to the instance as user 'fedora' and run the measure.py script
 as described above.
 
-Fedora Cloud: https://getfedora.org/en/cloud/download/
+[Fedora Cloud]: https://getfedora.org/en/cloud/download/
