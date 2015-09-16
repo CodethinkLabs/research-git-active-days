@@ -22,9 +22,11 @@ The idea of the 'Git Active Days' metric was taken from the `git-summary` and
 
 import argparse
 import fnmatch
+import operator
 import os
 import subprocess
 import sys
+import time
 
 
 def active_days(repo, refs):
@@ -42,7 +44,7 @@ def active_days(repo, refs):
             continue
         else:
             date, time, timezone = line.split()
-        days.add(date)
+        days.add(parse_iso_date(date))
     return days
 
 
@@ -70,7 +72,7 @@ def active_person_days(repo, refs):
             continue
         else:
             date, time, timezone = datetime.split()
-        author_days.add((author_email, date))
+        author_days.add((author_email, parse_iso_date(date)))
     return author_days
 
 
@@ -96,6 +98,18 @@ def check_refs_exist(repo, refs):
             "Did not find refs %s in repo %s" % (', '.join(refs), repo))
 
 
+def check_and_parse_iso_date(date_string):
+    try:
+        return parse_iso_date(date_string)
+    except ValueError:
+        raise RuntimeError(
+            "Date '%s' does not follow YYYY-MM-DD pattern." % date_string)
+
+
+def parse_iso_date(date_string):
+    return time.strptime(date_string, '%Y-%m-%d')
+
+
 def filter_person_days(person_days_set, author_email_glob):
     result = set()
     for item in person_days_set:
@@ -108,22 +122,41 @@ def filter_person_days(person_days_set, author_email_glob):
     return result
 
 
+def filter_days(items_set, start_date=None, end_date=None, getter=lambda x: x):
+    '''Filter a set of items by dates.
+
+    By default, items_set is expected to contain time.struct_time objects.
+    However, you can pass a set of tuples or anything else, if you provide a
+    'getter' function that extracts the date from an item.
+
+    '''
+    # All days are > None, so we can always use the 'start_date' value.
+    if end_date:
+        return set(item for item in items_set
+                   if getter(item) >= start_date and getter(item) <= end_date)
+    else:
+        return set(item for item in items_set
+                   if getter(item) >= start_date)
+
+
 def argument_parser():
     parser = argparse.ArgumentParser(
         description="Counts days where commits were made, across one or more "
                     "Git repositories.")
 
     parser.add_argument(
-        '--filter-author-email', metavar='PATTERN', type=str,
-        help="only count commits where the author's email matches a glob "
-             "pattern")
+        'repos', metavar='<repo>', type=str, nargs='*',
+        help="Path to one or more Git repos. Where there are multiple repos, "
+             "an 'active day' is one where there was a commit in any of those "
+             "repos. If no paths are given, the current directory is used.")
 
-    # It might be clearer to have the inverse of this option instead
-    # (--combine-authors), but it's nice to have the default behaviour be
-    # the same as that of `git-summary` and `git-effort`.
     parser.add_argument(
         '--person-days', action='store_true',
         help="count commits per author on each day, not just number of days")
+
+    parser.add_argument(
+        '--ref', metavar='REF', action='append', dest='refs',
+        help="a Git ref pattern to measure. Default is to measure HEAD.")
 
     # This works by injecting the '--all' commandline option into the list of
     # refs, which we pass straight through to `git log`.
@@ -132,14 +165,17 @@ def argument_parser():
         help="measure all commits in all Git refs")
 
     parser.add_argument(
-        '--ref', metavar='REF', action='append', dest='refs',
-        help="a Git ref pattern to measure. Default is to measure HEAD.")
+        '--start-date', metavar='DATE', dest='start_date',
+        help="only count days from DATE (YYYY-MM-DD format)")
 
     parser.add_argument(
-        'repos', metavar='<repo>', type=str, nargs='*',
-        help="Path to one or more Git repos. Where there are multiple repos, "
-             "an 'active day' is one where there was a commit in any of those "
-             "repos. If no paths are given, the current directory is used.")
+        '--end-date', metavar='DATE', dest='end_date',
+        help="only count days up to and including DATE (YYYY-MM-DD format)")
+
+    parser.add_argument(
+        '--filter-author-email', metavar='PATTERN', type=str,
+        help="only count commits where the author's email matches a glob "
+             "pattern")
 
     return parser
 
@@ -155,6 +191,18 @@ def main():
     else:
         for repo in args.repos:
             check_refs_exist(repo, args.refs)
+
+    if args.start_date:
+        start_date = check_and_parse_iso_date(args.start_date)
+    else:
+        start_date = None
+
+    if args.end_date:
+        end_date = check_and_parse_iso_date(args.end_date)
+        if start_date and end_date < start_date:
+            raise RuntimeError("End date is before start date")
+    else:
+        end_date = None
 
     if args.filter_author_email and not args.person_days:
         raise RuntimeError("The --filter-author-email option cannot be used "
@@ -172,14 +220,21 @@ def main():
             all_person_days = filter_person_days(
                 all_person_days, args.filter_author_email)
 
-        result = len(all_person_days)
+        result = len(
+            filter_days(all_person_days,
+                        start_date=start_date,
+                        end_date=end_date,
+                        getter=operator.itemgetter(1)))
     else:
         all_days = set()
         for repo in args.repos:
             days = active_days(repo, refs=args.refs)
             all_days.update(days)
 
-        result = len(all_days)
+        result = len(
+            filter_days(all_days,
+                        start_date=start_date,
+                        end_date=end_date))
 
     print(result)
 
