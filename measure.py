@@ -111,8 +111,8 @@ def git_count_authors(gitdir, ref):
 
 def measure_component_source_repo(name, repo, ref):
     # Don't do this in /tmp, because on an OpenStack VM's root disk it will
-    # take FOREVER. FIXME: should get the path from YBD's config probably.
-    source_dir = tempfile.mkdtemp(dir='/src/tmp')
+    # take FOREVER.
+    source_dir = tempfile.mkdtemp(dir=ybd.app.config['tmp'])
     try:
         extract_commit(name, repo, ref, source_dir)
 
