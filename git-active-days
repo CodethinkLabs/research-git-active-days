@@ -31,8 +31,9 @@ def active_days(repo, refs):
     # List the author date for each commit.
     text = git_output(['git', 'log' , '--pretty=format:%ai'] + refs, cwd=repo)
 
+    # Store all dates in a set, which will merge any duplicates.
     days = set()
-    for line in text.decode('ascii').splitlines():
+    for line in text.splitlines():
         date, time, timezone = line.split()
         days.add(date)
     return days
@@ -52,8 +53,9 @@ def active_days_per_author(repo, refs):
     # See: https://tools.ietf.org/html/rfc3696#section-3
     text = git_output(['git', 'log' , '--pretty=format:%ae:%ai'] + refs, cwd=repo)
 
+    # Store all (email, date) pairs in a set, which will merge any duplicates.
     author_days = set()
-    for line in text.decode('ascii').splitlines():
+    for line in text.splitlines():
         author_email, datetime = line.split(':', 1)
         date, time, timezone = datetime.split()
         author_days.add((author_email, date))
@@ -65,7 +67,7 @@ def git_output(args, cwd=None):
         text = subprocess.check_output(args, cwd=cwd, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         raise RuntimeError("Git command failed, with output:\n%s" % e.output)
-    return text
+    return text.decode('unicode-escape')
 
 
 def check_refs_exist(repo, refs):
