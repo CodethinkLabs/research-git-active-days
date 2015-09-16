@@ -109,13 +109,13 @@ def measure_component_source_repo(name, repo, ref):
         all_refs_active_days = git_active_days(
             gitdir)
 
-        all_refs_active_days_per_author = git_active_days(
-            gitdir, per_author=True)
+        all_refs_active_person_days = git_active_days(
+            gitdir, person_days=True)
 
         ref_active_days = git_active_days(gitdir, ref=ref)
 
-        ref_active_days_per_author = git_active_days(
-            gitdir, ref=ref, per_author=True)
+        ref_active_person_days = git_active_days(
+            gitdir, ref=ref, person_days=True)
 
         authors = git_count_authors(gitdir, ref)
 
@@ -123,9 +123,9 @@ def measure_component_source_repo(name, repo, ref):
             'name': name,
             'sloc': sloc,
             'git_active_days_all_refs': all_refs_active_days,
-            'git_active_days_per_author_all_refs': all_refs_active_days_per_author,
             'git_active_days_for_ref': ref_active_days,
-            'git_active_days_per_author_for_ref': ref_active_days_per_author,
+            'git_active_person_days_all_refs': all_refs_active_person_days,
+            'git_active_person_days_for_ref': ref_active_person_days,
             'git_authors': authors,
         }
     finally:
@@ -151,7 +151,7 @@ def sloccount_physical_source_lines_of_code(name, source_dir):
     raise RuntimeError("Unexpected output from sloccount: %s" % text)
 
 
-def git_active_days(gitdir, ref=None, per_author=False):
+def git_active_days(gitdir, ref=None, person_days=False):
     '''Use 'git-active-days' to measure activity in a Git repository.
 
     If 'ref' is passed, days for just that ref are returned. Otherwise, all
@@ -167,8 +167,8 @@ def git_active_days(gitdir, ref=None, per_author=False):
     else:
         args = ['--all-refs']
 
-    if per_author:
-        args += ['--per-author']
+    if person_days:
+        args += ['--person-days']
 
     text = subprocess.check_output([script] + args + [gitdir])
 
@@ -232,8 +232,10 @@ def extract_commit(name, repo, ref, target_dir):
                           ybd.repos.get_repo_name(repo))
 
     if not os.path.exists(gitdir):
+        ybd.app.log(name, 'Cloning', repo)
         ybd.repos.mirror(name, repo)
     elif not ybd.repos.mirror_has_ref(gitdir, ref):
+        ybd.app.log(name, 'Updating', repo)
         ybd.repos.update_mirror(name, repo, gitdir)
 
     with tempfile.NamedTemporaryFile() as git_index_file:
@@ -241,7 +243,7 @@ def extract_commit(name, repo, ref, target_dir):
         git_env['GIT_INDEX_FILE'] = git_index_file.name
         git_env['GIT_WORK_TREE'] = target_dir
 
-        ybd.app.log(repo, 'Extracting commit', ref)
+        ybd.app.log(name, 'Extracting commit', ref)
         subprocess.check_call(
             ['git', 'read-tree', ref], env=git_env, cwd=gitdir)
         subprocess.check_call(

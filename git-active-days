@@ -45,12 +45,14 @@ def active_days(repo, refs):
     return days
 
 
-def active_days_per_author(repo, refs):
+def active_person_days(repo, refs):
     '''Return the list of active days in 'repo' for each commit author.
 
     For example, if Fred made four commits on Monday, and Suzie committed once
     on Monday and Tuesday, you will get 3 results: Fred was active Monday,
     and Suzie was active Monday and Tuesday.
+
+    The size of this set gives you an 'active person-days' metric.
 
     '''
     # List author email and author date for each commit.
@@ -107,7 +109,7 @@ def argument_parser():
     # (--combine-authors), but it's nice to have the default behaviour be
     # the same as that of `git-summary` and `git-effort`.
     parser.add_argument(
-        '--per-author', action='store_true',
+        '--person-days', action='store_true',
         help="count commits per author on each day, not just number of days")
 
     # This works by injecting the '--all' commandline option into the list of
@@ -143,12 +145,12 @@ def main():
 
     result = None
 
-    if args.per_author:
-        all_author_days = set()
+    if args.person_days:
+        all_person_days = set()
         for repo in args.repos:
-            author_days = active_days_per_author(repo, refs=args.refs)
-            all_author_days.update(author_days)
-        result = len(all_author_days)
+            person_days = active_person_days(repo, refs=args.refs)
+            all_person_days.update(person_days)
+        result = len(all_person_days)
     else:
         all_days = set()
         for repo in args.repos:
