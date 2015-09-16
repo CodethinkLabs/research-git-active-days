@@ -179,7 +179,6 @@ def main():
             days = active_days(repo, refs=args.refs)
             all_days.update(days)
 
-
         result = len(all_days)
 
     print(result)
