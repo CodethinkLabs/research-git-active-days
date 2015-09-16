@@ -34,7 +34,13 @@ def active_days(repo, refs):
     # Store all dates in a set, which will merge any duplicates.
     days = set()
     for line in text.splitlines():
-        date, time, timezone = line.split()
+        if len(line) == 0:
+            # A date of 1970-01-01 indicates the commit is corrupt somehow, and
+            # is represented as a blank line in the output. Ignore these.
+            # See also: http://thread.gmane.org/gmane.comp.version-control.git/250354/focus=250392
+            continue
+        else:
+            date, time, timezone = line.split()
         days.add(date)
     return days
 
@@ -57,7 +63,10 @@ def active_days_per_author(repo, refs):
     author_days = set()
     for line in text.splitlines():
         author_email, datetime = line.split(':', 1)
-        date, time, timezone = datetime.split()
+        if len(datetime) == 0:
+            continue
+        else:
+            date, time, timezone = datetime.split()
         author_days.add((author_email, date))
     return author_days
 
