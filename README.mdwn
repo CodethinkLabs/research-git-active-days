@@ -19,7 +19,7 @@ Running the scripts
 
 Clone this repo, and the Baserock reference system definitions.
 
-    git clone git://github.com/ssssam/research-git-active-days
+    git clone git://github.com/codethinklabs/research-git-active-days
     git clone git://git.baserock.org/baserock/baserock/definitions
 
 Now run the measure.py script:
