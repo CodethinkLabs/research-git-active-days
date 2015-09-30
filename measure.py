@@ -67,6 +67,11 @@ def main():
         # It's nice when developing the script to be able to ctrl+c and still
         # get some results.
         pass
+    except:
+        # It's nice to get some results even if something goes wrong
+        ybd.app.log(c, 'ERROR during analysis - results are incomplete')
+        pass
+
 
     with open('results.csv', 'w') as f:
         ybd.app.log('results', 'Writing results to', 'results.csv')
@@ -248,7 +253,6 @@ def extract_commit(name, repo, ref, target_dir):
             ['git', 'read-tree', ref], env=git_env, cwd=gitdir)
         subprocess.check_call(
             ['git', 'checkout-index', '--all'], env=git_env, cwd=gitdir)
-
 
 try:
     main()
