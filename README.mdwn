@@ -25,7 +25,7 @@ Clone this repo, and the Baserock reference system definitions.
 Now run the measure.py script:
 
     cd definitions
-    python ../research-git-active-days/measure.py systems/genivi-baseline-system-x86_64.morph
+    python ../research-git-active-days/measure.py systems/genivi-baseline-system-x86_64-generic.morph
 
 The script will find every component of the Baserock GENIVI Baseline reference
 system, clone all of the source code involved locally, and then use `sloccount`
