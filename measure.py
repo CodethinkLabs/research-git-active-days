@@ -144,8 +144,10 @@ def sloccount_physical_source_lines_of_code(name, source_dir):
     # There's no 'machine-readable' output feature of 'sloccount' that we could
     # use, we just match against a string in the output.
 
-    ybd.app.log(name, "Counting lines of code with sloccount in", source_dir)
-    text = subprocess.check_output(['sloccount', source_dir])
+    ybd.app.log(name, "Counting code lines with sloccount in", source_dir)
+    with open(os.devnull, "w") as fnull:
+        text = subprocess.check_output(['sloccount', source_dir],
+                                       stderr=fnull)
 
     for line in text.decode('unicode-escape').splitlines():
         if line.startswith('Total Physical Source Lines of Code (SLOC)'):
