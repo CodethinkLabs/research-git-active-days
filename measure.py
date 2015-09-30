@@ -100,7 +100,8 @@ def measure_component_source_repo(name, repo, ref):
     # take FOREVER.
     source_dir = tempfile.mkdtemp(dir=ybd.app.config['tmp'])
     try:
-        extract_commit(name, repo, ref, source_dir)
+#        extract_commit(name, repo, ref, source_dir)
+        ybd.repos.checkout(name, repo, ref, source_dir)
 
         try:
             sloc = sloccount_physical_source_lines_of_code(name, source_dir)
