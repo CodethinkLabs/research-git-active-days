@@ -101,13 +101,14 @@ def check_refs_exist(repo, refs):
 def check_and_parse_iso_date(date_string):
     try:
         return parse_iso_date(date_string)
-    except ValueError:
+    except:
         raise RuntimeError(
             "Date '%s' does not follow YYYY-MM-DD pattern." % date_string)
 
 
 def parse_iso_date(date_string):
-    return time.strptime(date_string, '%Y-%m-%d')
+
+    return time.strptime(date_string[-10:], '%Y-%m-%d')
 
 
 def filter_person_days(person_days_set, author_email_glob):
