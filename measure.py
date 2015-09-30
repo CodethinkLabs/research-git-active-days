@@ -74,7 +74,9 @@ def main():
 
 
     with open('results.csv', 'w') as f:
-        ybd.app.log('results', 'Writing results to', 'results.csv')
+        ybd.app.log('RESULTS', 'LOC generated using',
+                    "David A. Wheeler's 'SLOCCount'")
+        ybd.app.log('RESULTS', 'Writing results to', 'results.csv')
         rows = results.values()
         columns = sorted(rows[0].keys())
         write_csv_file(
@@ -149,14 +151,18 @@ def sloccount_physical_source_lines_of_code(name, source_dir):
     with open(os.devnull, "w") as fnull:
         text = subprocess.check_output(['sloccount', source_dir],
                                        stderr=fnull)
-
     for line in text.decode('unicode-escape').splitlines():
+        if line.startswith('Development Effort Estimate'):
+            print line
         if line.startswith('Total Physical Source Lines of Code (SLOC)'):
+            print line
             number_string = line.split()[-1]
             number_string = number_string.replace(',', '')
-            return int(number_string)
-
-    raise RuntimeError("Unexpected output from sloccount: %s" % text)
+    try:
+        ybd.app.log(name, "Sloccount LOC is", number_string)
+        return int(number_string)
+    except:
+        raise RuntimeError("Unexpected output from sloccount: %s" % text)
 
 
 def git_active_days(gitdir, ref=None, person_days=False):
