@@ -17,7 +17,21 @@ sloccount, and [YBD] installed.
 Running the scripts
 -------------------
 
-Clone this repo, and the Baserock reference system definitions.
+The git-active-days script can be run on one git working directory or several.
+
+Some examples:
+
+    # count GAD for for master across two repos
+    git-active-days a-git-directory another-git-directory
+
+    # count GAD across three repos, by engineers from foo.com,
+    # for a date range, across all refs
+    git-active-days --person-days --filter-author-email='*@foo.com' \
+            --start-date=2014-01-01 end-date=2015-08-01 --all-refs  \
+            definitions morph ybd
+
+The measure.py script runs git-active-days and David A. Wheeler's SLOCCount
+on a set of git repositories. Try try it, clone this repo, and the Baserock reference system definitions.
 
     git clone git://github.com/codethinklabs/research-git-active-days
     git clone git://git.baserock.org/baserock/baserock/definitions
