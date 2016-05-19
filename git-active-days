@@ -71,7 +71,10 @@ def active_person_days(repo, refs):
         if len(datetime) == 0:
             continue
         else:
-            date, time, timezone = datetime.split()
+            try:
+                date, time, timezone = datetime.split()
+            except:
+                print "Skipping entry:" + repr(datetime)
         author_days.add((author_email, parse_iso_date(date)))
     return author_days
 
